@@ -15,14 +15,23 @@ dp = Dispatcher()
 
 players = {}  # user_id -> {"current": "intro", "role": "soldier", "inventory": set()}
 
+# --- Хелпер для обрезки текста кнопок ---
+def truncate_text(text: str, max_len: int = 50) -> str:
+    """Обрезает текст кнопки до безопасной длины."""
+    return text if len(text) <= max_len else text[:max_len - 1] + "…"
+
 # --- Хелпер для вывода сцены ---
 def get_scene_keyboard(scene_key: str, user_id: int) -> InlineKeyboardMarkup:
     scene = story.get(scene_key)
     buttons = [
-        [InlineKeyboardButton(text=choice["text"], callback_data=f"{scene_key}:{key}")]
+        [InlineKeyboardButton(
+            text=truncate_text(choice["text"]),
+            callback_data=f"{scene_key}:{key}"
+        )]
         for key, choice in scene["choices"].items()
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
 
 
 async def send_scene(user_id: int, scene_key: str):
@@ -46,6 +55,18 @@ async def start_game(message: types.Message):
 async def on_choice(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     data = callback.data
+
+    # если пользователь не начинал игру (например, после рестарта)
+    if user_id not in players:
+        players[user_id] = {"current": "intro", "role": None, "inventory": set()}
+        await callback.answer("Игра перезапущена, начинаем заново 🔁")
+        await send_scene(user_id, "intro")
+        return
+
+    if ":" not in data:
+        await callback.answer("Неверный формат данных.")
+        return
+
     current, choice_key = data.split(":", 1)
     scene = story.get(current)
     if not scene:
@@ -57,13 +78,14 @@ async def on_choice(callback: types.CallbackQuery):
         await callback.answer("Ошибка выбора.")
         return
 
-    # Сохраняем роль, если указана
+    # сохраняем роль, если есть
     if "role" in choice:
         players[user_id]["role"] = choice["role"]
 
     next_scene = choice["next"]
     await callback.message.delete()
     await send_scene(user_id, next_scene)
+
 
 # --- Render web hook (health check) ---
 async def health_check(request):
