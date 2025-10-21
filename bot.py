@@ -18,10 +18,12 @@ players = {}  # user_id -> {"current": "intro", "role": "soldier", "inventory": 
 # --- Хелпер для вывода сцены ---
 def get_scene_keyboard(scene_key: str, user_id: int) -> InlineKeyboardMarkup:
     scene = story.get(scene_key)
-    kb = InlineKeyboardMarkup()
-    for key, choice in scene["choices"].items():
-        kb.add(InlineKeyboardButton(text=choice["text"], callback_data=f"{scene_key}:{key}"))
-    return kb
+    buttons = [
+        [InlineKeyboardButton(text=choice["text"], callback_data=f"{scene_key}:{key}")]
+        for key, choice in scene["choices"].items()
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
 
 async def send_scene(user_id: int, scene_key: str):
     scene = story.get(scene_key)
